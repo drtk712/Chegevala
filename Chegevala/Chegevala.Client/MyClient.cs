@@ -105,8 +105,17 @@ namespace Chegevala.Client
         #endregion
         public void Close()
         {
-            connection.Close();
-            Environment.Exit(0);
+            //loginChannel.Close();
+            //cheatChannel.Close();
+            try
+            {
+                connection.Close();
+                Environment.Exit(0);
+            }
+            catch
+            {
+
+            }
         }
     }
 }

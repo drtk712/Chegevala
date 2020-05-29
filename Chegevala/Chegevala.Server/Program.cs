@@ -4,9 +4,10 @@ namespace Chegevala.Server
 {
     class Program
     {
-        public static MyServer myServer = new MyServer();
+        public static MyServer myServer;
         static void Main(string[] args)
         {
+            myServer=new MyServer();
             //进程退出事件
             AppDomain.CurrentDomain.ProcessExit += (a, b) =>
             {

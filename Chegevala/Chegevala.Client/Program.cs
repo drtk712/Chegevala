@@ -5,9 +5,10 @@ namespace Chegevala.Client
 {
     class Program
     {
-        public static MyClient client = new MyClient();
+        public static MyClient client;
         static void Main(string[] args)
         {
+            client = new MyClient();   
             //进程退出事件
             AppDomain.CurrentDomain.ProcessExit += (a, b) =>
             {

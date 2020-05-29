@@ -17,7 +17,7 @@ namespace Chegevala.Server
         private IConnection connection;
         public MyServer()
         {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var factory = new ConnectionFactory() { HostName = "localhost"};
             connection = factory.CreateConnection();
             //登录
             #region 登录模块初始化
@@ -117,8 +117,18 @@ namespace Chegevala.Server
         #endregion
         public void Close()
         {
-            connection.Close();
-            Environment.Exit(0);
+            //loginChannel.Close();
+            //receiveChannel.Close();
+            try
+            {
+                connection.Close();
+                Environment.Exit(0);
+            }
+            catch
+            {
+
+            }
+
         }
     }
 }
