@@ -18,7 +18,8 @@ namespace Chegevala.Client
         private BlockingCollection<string> respQueue = new BlockingCollection<string>();
         public MyClient()
         {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var factory = new ConnectionFactory() { HostName = "www.dairui.work", UserName = "rey", Password = "dr603500521" };
+            //var factory = new ConnectionFactory() { HostName = "localhost" };
             connection = factory.CreateConnection();
             #region 登录模块初始化
             loginChannel = connection.CreateModel();
