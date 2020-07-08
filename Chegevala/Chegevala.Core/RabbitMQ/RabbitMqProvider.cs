@@ -91,7 +91,9 @@ namespace Chegevala.Core.RabbitMQ
                 mqVirtualHost = virtualHost;
             }
         }
-
+        /// <summary>
+        /// 卸载服务
+        /// </summary>
 
         public void Unload()
         {
@@ -531,7 +533,11 @@ namespace Chegevala.Core.RabbitMQ
                 {
                     if (tempChannel.ConsumerChannel != null)
                     {
-                        bool result = tempChannel.ReceiveMessageCallback(new RemoteMessage() { JsonContent = message });
+                        bool result = tempChannel.ReceiveMessageCallback(new RemoteMessage() 
+                        {
+                            JsonContent = message,
+                            SenderUID=args.BasicProperties.ReplyTo
+                        });
                         if (result)
                         {
                             if (tempChannel.ConsumerChannel != null && !tempChannel.ConsumerChannel.IsClosed)
