@@ -32,7 +32,10 @@ namespace Chegevala.Core.Utility
         #endregion
 
         private IConfiguration configuration;
-        public IConfiguration Configuration { get; set; }
+        public IConfiguration Configuration
+        {
+            get { return configuration; }
+        }
         public ConfigurationHelper()
         {
             configuration = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json").Build();

@@ -16,7 +16,7 @@ namespace Chegevala.Core.Utility
         }
         public static string ServerTopic()
         {
-            return "";
+            return "MyService";
         }
     }
 }
