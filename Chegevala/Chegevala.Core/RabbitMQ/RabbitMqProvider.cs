@@ -1,5 +1,8 @@
-﻿using Chegevala.Core.Utility;
+﻿using Chegevala.Core.EntityModel.Models;
+using Chegevala.Core.EntityModel.Models.Enum;
+using Chegevala.Core.Utility;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
@@ -64,9 +67,13 @@ namespace Chegevala.Core.RabbitMQ
         {
             get { return channelList; }
         }
-        public ConnectChannel ConnectChannel(string channelGuid)
+        public ConnectChannel GetConnectChannelByGuid(string channelGuid)
         {
             return channelList.Where(n => n.ChannelGuid == channelGuid).FirstOrDefault();
+        }
+        public ConnectChannel GetConnectChannelByName(string channelName)
+        {
+            return channelList.Where(n => n.ChannelName == channelName).FirstOrDefault();
         }
         public Func<RemoteMessage, bool> ReceiveMessageCallback { get; set; }
         /// <summary>
@@ -74,41 +81,6 @@ namespace Chegevala.Core.RabbitMQ
         /// </summary>
         public RabbitMqProvider()
         {
-
-
-
-
-            var factory = new ConnectionFactory() { HostName = "localhost" };
-            var connection = factory.CreateConnection();
-
-            var channel = connection.CreateModel();
-
-
-            channel.QueueDeclare(queue: "hello", durable: true, exclusive: false, autoDelete: false);
-
-
-            var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (sender, ea) =>
-            {
-                //。。。。。。。
-                //在这里进行任务
-                channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-            };
-
-            channel.BasicConsume(queue: "task_queue", autoAck: false, consumer: consumer);
-
-            // prefetchSize：消息体大小限制；0为不限制
-            // prefetchCount：RabbitMQ同时给一个消费者推送的消息个数。即一旦有N个消息还没有ack，
-            //则该consumer将block掉，直到有消息ack。默认是1.
-            // global：限流策略的应用级别。consumer[false]、channel[true]。
-            channel.BasicQos(prefetchSize: 100, prefetchCount: 10, global: true);
-
-
-            string message = "Hello World!";
-           ​var body = Encoding.UTF8.GetBytes(message);
-
-           ​channel.BasicPublish(exchange:"",routingKey:"hello",basicProperties:null,body:body);
-
             mqHostIp = ConfigurationHelper.Instance.Configuration.GetValue<string>("IP");
             mqHostPort = ConfigurationHelper.Instance.Configuration.GetValue<ushort>("Port");
             mqUserName = ConfigurationHelper.Instance.Configuration.GetValue<string>("Name");
@@ -208,7 +180,7 @@ namespace Chegevala.Core.RabbitMQ
         /// <param name="exchangeName"></param>
         /// <param name="msgCallback"></param>
         /// <returns></returns>
-        public bool ConstructMqChannel(string channelName,Func<RemoteMessage, BasicDeliverEventArgs, bool> msgCallback)
+        public bool ConstructMqChannel(string channelName, Func<RemoteMessage, BasicDeliverEventArgs, bool> msgCallback)
         {
             if (string.IsNullOrEmpty(channelName))
             {
@@ -223,10 +195,11 @@ namespace Chegevala.Core.RabbitMQ
             }
             ConnectChannel connectChannel = new ConnectChannel();
             connectChannel.ChannelName = channelName;
+            connectChannel.ChannelGuid = Guid.NewGuid().ToString();
             connectChannel.QueueNames = new List<string>();
             connectChannel.ReceiveMessageCallback = msgCallback;
             connectChannel.AccessLock = new object();
-
+            connectChannel.ExchangeType = ExchangeType.noexist;
             connectChannel.ConsumerChannel = null;
             try
             {
@@ -292,7 +265,7 @@ namespace Chegevala.Core.RabbitMQ
 
         }
 
-        public bool ConstructMqQueue(string channelName, string queueName, string bindingKey)
+        public bool ConstructMqQueue(string channelName, string queueName = null, string bindingKey = null)
         {
             if (string.IsNullOrEmpty(queueName))
             {
@@ -363,11 +336,11 @@ namespace Chegevala.Core.RabbitMQ
                 {
                     var consumer = new EventingBasicConsumer(temp.ConsumerChannel);
                     consumer.Received += Consumer_MultiReceived;
-                    temp.ConsumerChannel.BasicConsume(queueName, false, consumer);
+                    temp.ConsumerChannel.BasicConsume(queueName, false, temp.ChannelGuid, consumer);
                 }
                 return true;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 LogHelper.LogError(e.Message);
                 return false;
@@ -402,11 +375,7 @@ namespace Chegevala.Core.RabbitMQ
                 {
                     if (tempChannel.ConsumerChannel != null)
                     {
-                        bool result = tempChannel.ReceiveMessageCallback(new RemoteMessage()
-                        {
-                            JsonContent = message,
-                            SenderUID = args.BasicProperties.ReplyTo
-                        }, args);
+                        bool result = tempChannel.ReceiveMessageCallback(JsonConvert.DeserializeObject<RemoteMessage>(message), args) ;
                         if (result)
                         {
                             if (tempChannel.ConsumerChannel != null && !tempChannel.ConsumerChannel.IsClosed)
@@ -421,7 +390,7 @@ namespace Chegevala.Core.RabbitMQ
                 }
             }
         }
-        public bool Send(string channelName, string queueName , RemoteMessage message, string replyTo,string routingKey = null)
+        public bool Send(string channelName, RemoteMessage message, string queueName=null)
         {
             if (message == null)
             {
@@ -434,7 +403,7 @@ namespace Chegevala.Core.RabbitMQ
                 LogHelper.LogError($"Channel {channelName} Not Exist");
                 return false;
             }
-            if (!channel.QueueNames.Contains(queueName))
+            if (queueName!=null && !channel.QueueNames.Contains(queueName))
             {
                 LogHelper.LogError($"Queue {queueName} Not Exist");
                 return false;
@@ -443,21 +412,29 @@ namespace Chegevala.Core.RabbitMQ
             try
             {
                 var properties = channel.ConsumerChannel.CreateBasicProperties();
-                properties.Persistent = true;
-                properties.ReplyTo = replyTo;
+                properties.Persistent = message.EnablePersistent;
                 properties.CorrelationId = channel.ChannelGuid;
-                //convert message to byte[]
-                var msgBody = Encoding.UTF8.GetBytes(message.JsonContent);
 
+                //convert message to byte[]
+                var msgBody = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+                
                 //send message
 
                 if (channel.ExchangeType == ExchangeType.noexist)
                 {
-                    channel.ConsumerChannel.BasicPublish("", channel.QueueName, properties, msgBody);
+                    if (queueName != null)
+                    {
+                        channel.ConsumerChannel.BasicPublish("", queueName, properties, msgBody);
+                    }
+                    else
+                    {
+                        LogHelper.LogError($"Queue Name Not Be NULL");
+                        return false;
+                    }
                 }
-                else if ((channel.ExchangeType == ExchangeType.topic || channel.ExchangeType == ExchangeType.direct) && !string.IsNullOrEmpty(routingKey))
+                else if ((channel.ExchangeType == ExchangeType.topic || channel.ExchangeType == ExchangeType.direct) && !string.IsNullOrEmpty(message.TopicRoute))
                 {
-                    channel.ConsumerChannel.BasicPublish(channel.ExchangeName, routingKey, properties, msgBody);
+                    channel.ConsumerChannel.BasicPublish(channel.ExchangeName, message.TopicRoute, properties, msgBody);
                 }
                 else if (channel.ExchangeType == ExchangeType.fanout)
                 {
@@ -471,6 +448,40 @@ namespace Chegevala.Core.RabbitMQ
                 return false;
             }
             return true;
+        }
+        public void DeleteQueue(string channel,string queue)
+        {
+            if (String.IsNullOrEmpty(channel) || String.IsNullOrEmpty(queue))
+            {
+                Console.WriteLine("Params Must Not Be NULL");
+            }
+            ConnectChannel tempChannel = null;
+            lock (listAccessLock)
+            {
+                if (channelList != null)
+                {
+                    tempChannel = channelList.Where(p => p != null && p.ChannelName == channel).FirstOrDefault();
+                }
+            }
+            if (tempChannel != null)
+            {
+                lock (tempChannel.AccessLock)
+                {
+                    if (tempChannel.QueueNames!=null && tempChannel.QueueNames.Contains(queue))
+                    {
+                        tempChannel.ConsumerChannel.QueueDelete(queue);
+                        tempChannel.QueueNames.Remove(queue);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{queue} Not Exist");
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"{channel} Not Exist");
+            }
         }
         #region 关闭rabbitmq服务与通道
         public bool DestructMqConsumerChannel()

@@ -13,9 +13,7 @@ namespace Chegevala.Server
             //{
             //    myServer.Close();
             //};
-            MyService myService = new MyService();
-            myService.RunConnection(new TimeSpan(0, 0, 5), new TimeSpan(0, 0, 30));
-            myService.RunLoginModule();
+            MyService myService = new MyService(new TimeSpan(0, 0, 5), new TimeSpan(0, 0, 30));
             Console.WriteLine("Chegevala server is running.");
             Console.WriteLine("Press [enter] to close.");
             Console.ReadLine();

@@ -1,4 +1,7 @@
-﻿using Chegevala.Core.RabbitMQ;
+﻿using Chegevala.Core.EntityModel.Models;
+using Chegevala.Core.EntityModel.Models.Enum;
+using Chegevala.Core.RabbitMQ;
+using Chegevala.Core.Utility;
 using RabbitMQ.Client.Events;
 using System;
 using System.Linq;
@@ -34,23 +37,45 @@ namespace Chegevala.Client
             //    }
             //    MenuHelpper(Console.ReadLine());
             //}
-
-            RabbitMqProvider rabbitMqProvider = new RabbitMqProvider();
-            if (rabbitMqProvider.ConstructMqConsumerConn(new TimeSpan(0, 0, 10), new TimeSpan(0, 0, 10)))
-            {
-                var channelguid = rabbitMqProvider.ConstructSimpleQueueConsumerChannel( "login",  null);
-
-                var channelguid2 = rabbitMqProvider.ConstructTopicExchangeConsumerChannel("Message_Exchange", "dr", "Service", test);
-                rabbitMqProvider.Consume(channelguid2);
-
-                rabbitMqProvider.ConnectChannel(channelguid2).ConsumerChannel.BasicPublish()
-                rabbitMqProvider.Send(channelguid, new RemoteMessage() { JsonContent = "dr 123"});
-
-                Console.ReadLine();
-            }
-
+            ClientService clientService = new ClientService(new TimeSpan(0, 0, 10), new TimeSpan(0, 0, 10));
+            Console.WriteLine("请登录");
+            var a = Console.ReadLine();
+            clientService.Login(a.Split(" ")[0], a.Split(" ")[1]);
+            Console.WriteLine("发送消息");
+            a = Console.ReadLine();
+            clientService.SendMessage(a.Split(" ")[0], a.Split(" ")[1]);
+            Console.WriteLine("发送消息");
+            a = Console.ReadLine();
+            clientService.SendMessage(a.Split(" ")[0], a.Split(" ")[1]);
+            Console.WriteLine("发送消息");
+            a = Console.ReadLine();
+            clientService.SendMessage(a.Split(" ")[0], a.Split(" ")[1]);
+            Console.ReadLine();
         }
+        private static bool MessageModuleCallBack(RemoteMessage remoteMessage, BasicDeliverEventArgs args)
+        {
+            switch (remoteMessage.MessageType)
+            {
+                case MessageType.LoginCallBack:
+                    if (remoteMessage.JsonContent == "true")
+                    {
 
+                    }
+                    else
+                    {
+
+                    }
+                    break;
+                case MessageType.SystemMessage:
+                    break;
+                case MessageType.GroupMessage:
+                    break;
+                case MessageType.UserMessage:
+                    break;
+            }
+            Console.WriteLine(remoteMessage.JsonContent);
+            return true;
+        }
         public static bool test(RemoteMessage message, BasicDeliverEventArgs args)
         {
             Console.WriteLine(message.JsonContent);
